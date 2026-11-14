@@ -1,6 +1,6 @@
 # ZSHconfig
 Just the config files for my ZSH
 
-In order to use them, you need to create a link to the main.zsh file in your home directory named .zshrc
+To clone it and then use the instalation script run this:
 
-```ln -s ~/ZSHconfig/main.zsh ~/.zshrc```
+```git clone https://github.com/Hiowaroia/ZSHconfig ~/zsh-config && zsh ~/zsh-config/install.sh```

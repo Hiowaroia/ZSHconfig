@@ -1,62 +1,45 @@
 # ==============================================================================
-# 1. HISTORY & SHELL OPTIONS
+# Main config (~/.zshrc)
 # ==============================================================================
 
-# --- Command History ---
-# Define where and how many terminal commands are saved in memory and on disk.
+# Profiling: uncomment, restart zsh, then run `zprof`.
+# zmodload zsh/zprof
+
+# --- History ---
 HISTFILE=~/.histfile
-HISTSIZE=1000
-SAVEHIST=1000
+HISTSIZE=50000
+SAVEHIST=50000
+setopt HIST_IGNORE_ALL_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS SHARE_HISTORY
 
-# --- Shell Behaviors ---
-# Beep on input errors in the Zsh line editor.
-setopt beep
-# Allow dynamic variable evaluation in the prompt (required for custom themes).
-setopt PROMPT_SUBST
+# --- Shell options ---
+unsetopt beep
+setopt AUTO_CD INTERACTIVE_COMMENTS
 
-# ==============================================================================
-# 2. AUTO-COMPLETION
-# ==============================================================================
-
-# Initialize the advanced Zsh tab-completion system.
+# --- Completion ---
+# Rebuild the dump at most once a day, otherwise use the cache.
+# After installing new packages: rm ~/.zcompdump && exec zsh
 autoload -Uz compinit
-compinit
+_zcd=(${ZDOTDIR:-$HOME}/.zcompdump(N.mh+24))
+if (( $#_zcd )); then compinit; else compinit -C; fi
+unset _zcd
 
-# Define the target file for Zsh's built-in compinstall tool.
-zstyle :compinstall filename "$HOME/.zshrc"
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 
-# ==============================================================================
-# 3. ENVIRONMENT VARIABLES
-# ==============================================================================
-
-# Set micro as the default text editor for system commands (like git or visudo).
+# --- Environment ---
 export EDITOR=micro
+export VISUAL=$EDITOR
+export MICRO_TRUECOLOR=1
 
-# Enables true colour for Micro
-export "MICRO_TRUECOLOR=1"
+# --- Setting this config files location into variable ---
+ZSH_FOLDER=${${(%):-%x}:A:h}
 
-# ==============================================================================
-# 4. EXTERNAL CONFIGURATIONS & MODULES
-# ==============================================================================
-# The configuration is split into separate files to keep .zshrc clean and readable.
+# --- Modules (order matters: keybinds before plugins) ---
+source "$ZSH_FOLDER/aliases.zsh"
+source "$ZSH_FOLDER/prompt.zsh"
+source "$ZSH_FOLDER/keybinds.zsh"
+source "$ZSH_FOLDER/plugins.zsh"
 
-# Load custom command shortcuts (aliases).
-source "$HOME/.zsh/aliases.zsh"
-
-# Load the visual layout and logic for the terminal prompt.
-source "$HOME/.zsh/prompt.zsh"
-
-# Load keyboard shortcuts.
-# Note: This file uses `bindkey` commands to map specific keystrokes
-# (e.g., Ctrl+Arrow, Home/End, Delete) to terminal actions.
-source "$HOME/.zsh/keybinds.zsh"
-
-# Load community plugins (e.g., syntax highlighting, autosuggestions).
-source "$HOME/.zsh/plugins.zsh"
-
-# ==============================================================================
-# 5. STARTUP COMMANDS
-# ==============================================================================
-
-# Display system information script upon opening a new terminal session.
-fastfetch --config shorty
+# --- Startup ---
+(( $+commands[fastfetch] )) && fastfetch --config shorty

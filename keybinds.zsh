@@ -1,76 +1,86 @@
 # ==============================================================================
-# ZSH Line Editor (ZLE) Keybindings & Text Selection
+# ZLE keybindings: movement, selection, Delete/Home/End
+# Normal (^[[) and application-mode (^[O) sequences are both bound, so this
+# works across terminals (Kitty, WezTerm, TTY).
 # ==============================================================================
 
-# --- Jump by word (Ctrl + Left / Right) ---
-# Note: These initial bindings are technically overridden by the "Cancel selection"
-# section below, which adds deselect functionality to the exact same keycodes.
-bindkey '^[[1;5D' backward-word
-bindkey '^[[1;5C' forward-word
+# --- Selection widgets (set mark if needed, then move) ---
+# Dot-prefixed widgets bypass autosuggestions, so selecting never accepts it.
+select-backward-char() { (( REGION_ACTIVE )) || zle set-mark-command; zle .backward-char }
+select-forward-char()  { (( REGION_ACTIVE )) || zle set-mark-command; zle .forward-char }
+select-backward-word() { (( REGION_ACTIVE )) || zle set-mark-command; zle .backward-word }
+select-forward-word()  { (( REGION_ACTIVE )) || zle set-mark-command; zle .forward-word }
+select-to-line-start() { (( REGION_ACTIVE )) || zle set-mark-command; zle .beginning-of-line }
+select-to-line-end()   { (( REGION_ACTIVE )) || zle set-mark-command; zle .end-of-line }
 
-# --- Select by word (Ctrl + Shift + Left / Right) ---
-# Function to highlight text word-by-word moving backward
-select-backward-word() {
-  # If a selection (region) is NOT already active, set the mark (start selection)
-  (( REGION_ACTIVE )) || zle set-mark-command
-  # Move the cursor backward by one word, highlighting the text in between
-  zle backward-word
+# --- Movement widgets (clear selection, then move) ---
+deselect-backward-char()   { REGION_ACTIVE=0; zle backward-char }
+deselect-forward-char()    { REGION_ACTIVE=0; zle forward-char }
+deselect-backward-word()   { REGION_ACTIVE=0; zle backward-word }
+deselect-forward-word()    { REGION_ACTIVE=0; zle forward-word }
+deselect-beginning-of-line() { REGION_ACTIVE=0; zle beginning-of-line }
+deselect-end-of-line()     { REGION_ACTIVE=0; zle end-of-line }
+
+# --- Delete / Backspace remove the selection if there is one ---
+backspace-or-delete-selection() {
+  if (( REGION_ACTIVE )); then zle kill-region; else zle backward-delete-char; fi
+}
+delete-or-delete-selection() {
+  if (( REGION_ACTIVE )); then zle kill-region; else zle delete-char; fi
 }
 
-# Function to highlight text word-by-word moving forward
-select-forward-word() {
-  (( REGION_ACTIVE )) || zle set-mark-command
-  zle forward-word
+# --- Typing replaces the selection ---
+replace-selection-self-insert() {
+  (( REGION_ACTIVE )) && zle kill-region
+  zle .self-insert
 }
 
-# Register the shell functions as interactive ZLE widgets so they can be bound to keys
+zle -N select-backward-char
+zle -N select-forward-char
 zle -N select-backward-word
 zle -N select-forward-word
-
-# Bind Ctrl + Shift + Left/Right to the custom selection widgets
-bindkey '^[[1;6D' select-backward-word
-bindkey '^[[1;6C' select-forward-word
-
-# --- Cancel selection on normal movement ---
-# Wrappers for standard movement that disable the selection highlight first
-deselect-backward-char() { REGION_ACTIVE=0; zle backward-char }
-deselect-forward-char()  { REGION_ACTIVE=0; zle forward-char }
-deselect-backward-word() { REGION_ACTIVE=0; zle backward-word }
-deselect-forward-word()  { REGION_ACTIVE=0; zle forward-word }
-
-# Register the deselect functions as ZLE widgets
+zle -N select-to-line-start
+zle -N select-to-line-end
 zle -N deselect-backward-char
 zle -N deselect-forward-char
 zle -N deselect-backward-word
 zle -N deselect-forward-word
+zle -N deselect-beginning-of-line
+zle -N deselect-end-of-line
+zle -N backspace-or-delete-selection
+zle -N delete-or-delete-selection
+zle -N self-insert replace-selection-self-insert
 
-# Bind standard Left/Right arrows to clear selection and move by one character
-# Both standard ANSI (^[[D) and Application mode (^[OD) escape sequences are bound
-# to ensure compatibility across different terminal emulators (like WezTerm vs standard TTY)
-bindkey '^[[D' deselect-backward-char
-bindkey '^[OD' deselect-backward-char
-bindkey '^[[C' deselect-forward-char
-bindkey '^[OC' deselect-forward-char
+# --- Bindings ---
 
-# Bind Ctrl + Left/Right to clear selection and move by word
-# (This overrides the basic backward-word/forward-word bound at the top of the file)
+# Left / Right
+for k in '^[[D' '^[OD'; do bindkey $k deselect-backward-char; done
+for k in '^[[C' '^[OC'; do bindkey $k deselect-forward-char;  done
+
+# Ctrl + Left / Right
 bindkey '^[[1;5D' deselect-backward-word
 bindkey '^[[1;5C' deselect-forward-word
 
-# --- Backspace deletes selection ---
-# Overrides standard backspace to delete the entire highlighted block if one exists
-backspace-or-delete-selection() {
-  if (( REGION_ACTIVE )); then
-    # If text is selected, delete the entire highlighted region
-    zle kill-region
-  else
-    # Otherwise, perform a standard single-character backspace
-    zle backward-delete-char
-  fi
-}
+# Home / End
+for k in '^[[H' '^[OH' '^[[1~'; do bindkey $k deselect-beginning-of-line; done
+for k in '^[[F' '^[OF' '^[[4~'; do bindkey $k deselect-end-of-line;       done
 
-# Register the backspace replacement as a ZLE widget
-zle -N backspace-or-delete-selection
+# Shift + Left / Right / Home / End: select
+bindkey '^[[1;2D' select-backward-char
+bindkey '^[[1;2C' select-forward-char
+bindkey '^[[1;2H' select-to-line-start
+bindkey '^[[1;2F' select-to-line-end
 
-# Bind the standard Backspace key (^?) to the custom widget
-bindkey '^?' backspace-or-delete-selection
+# Ctrl + Shift + Left / Right: select by word
+bindkey '^[[1;6D' select-backward-word
+bindkey '^[[1;6C' select-forward-word
+
+# Backspace / Delete
+bindkey '^?'      backspace-or-delete-selection
+bindkey '^[[3~'   delete-or-delete-selection
+
+# Ctrl + Backspace / Delete (if the terminal sends these)
+bindkey '^H'      backward-kill-word
+bindkey '^[[3;5~' kill-word
+
+unset k

@@ -1,113 +1,121 @@
 # ==============================================================================
-# Interactive Text Editor Selection & Wrapper Functions
+# Editor selection & wrappers
 # ==============================================================================
 
-# Prompts the user to select an editor and exports it to $EDITOR
-choose_editor() {
+# Pick an editor for this session (Enter keeps the current one).
+choose-editor() {
   local choice
-  # Prompt for user input
-  read "choice?Editor [n]ano / n[v]im / [k]ate / [m]icro (default: $EDITOR): "
+  read "choice?Editor: [n]ano / n[v]im / [k]ate / [m]icro (current: $EDITOR): "
 
   case "${choice:l}" in
-    v|nvim|nvim)        export EDITOR=nvim ;;     # Set Neovim for 'v', 'nvim' or 'vim'
-    m|micro)            export EDITOR=micro ;;    # Set Micro for 'm' or 'micro'
-    k|kate)             export EDITOR=kate ;;     # Set Kate GUI editor for 'k' or 'kate'
-    n|nano)             export EDITOR=nano ;;     # Default to Nano for 'n', 'nano', or empty Return
-    "")                 ;;                        # If left empty, does nothing, and so keeps $EDITOR as it was
-    *)                  echo "Unknown choice, using $EDITOR"; ;; # PRetty much the same as above
+    n|nano)     export EDITOR=nano ;;
+    v|nvim|vim) export EDITOR=nvim ;;
+    k|kate)     export EDITOR=kate ;;
+    m|micro)    export EDITOR=micro ;;
+    "")         ;;
+    *)          echo "Unknown choice, keeping $EDITOR" ;;
   esac
+
+  export VISUAL=$EDITOR
 }
 
-# Opens target file(s) with chosen $EDITOR as current user
+# Edit as current user. ${=EDITOR} splits flags stored in $EDITOR.
 edit() {
-  choose_editor
-  ${=EDITOR} "$@"  # ${=EDITOR} enables word-splitting in ZSH to handle flags inside $EDITOR
+  choose-editor
+  ${=EDITOR} "$@"
 }
 
-# Opens target file(s) with root privileges (bypassing sudo for GUI editors like Kate)
-edit_sudo() {
-  choose_editor
+# Edit as root. GUI editors (Kate) run directly and ask for auth themselves.
+edit-sudo() {
+  choose-editor
   case "$EDITOR" in
-    kate*) ${=EDITOR} "$@" ;;       # Run GUI editors directly (avoiding sudo GUI issues)
-    *)     sudo ${=EDITOR} "$@" ;;  # Run CLI editors (nano/nvim) with elevated privileges
+    kate*) ${=EDITOR} "$@" ;;
+    *)     sudo ${=EDITOR} "$@" ;;
   esac
 }
 
 # ==============================================================================
-# Display & Terminal Utilities
+# Display & terminal
 # ==============================================================================
 
-# Enable automatic color output for file listings and pattern searches
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 
-# Display Fastfetch output, wait for any single keypress, then clear terminal state
+# Fastfetch, wait for a key, then reset the terminal.
 alias cff='clear && fastfetch && read -k 1 -s -r && reset'
 
-# Launch cmatrix in asynchronous scrolling mode with bold characters
 alias matrix='cmatrix -as'
 
 # ==============================================================================
-# System Maintenance & Management
+# System maintenance
 # ==============================================================================
 
-# Synchronize and upgrade Flatpak applications and Pacman system packages
-alias upd='sudo flatpak update -y && sudo pacman -Syu --noconfirm'
+# Update everything make a log file in ~/Documents/update-logs.
+upd() {
+  local log=~/Documents/update-logs/$(date +%F_%H-%M-%S).log
+  mkdir -p ${log:h}
+  {
+    sudo sh -c 'pacman -Syu --noconfirm; flatpak update -y'
+    flatpak update --user -y
+  } 2>&1 | tee $log
+  return 0
+}
 
-# Shut down the system immediately via systemd
 alias shut='systemctl poweroff'
 
-# Reboot directly into the Windows boot entry via systemd-boot's systemctl (currently not working, stil no idea why)
-alias windows='systemctl reboot --boot-loader-entry=windows'
+# Reboot into Windows once
+windows() {
+  local num
+  num=$(efibootmgr | awk '/Windows Boot Manager/ {gsub(/Boot|\*/,"",$1); print $1; exit}')
+  [[ -n $num ]] || { print -u2 "No Windows Boot Manager entry in NVRAM"; return 1 }
+  sudo efibootmgr --bootnext "$num" && systemctl reboot
+}
 
-# Reboot into motherboard UEFI/BIOS firmware interface
 alias uefi='systemctl reboot --firmware-setup'
-
-# Perform a quick userspace soft-reboot without restarting hardware/kernel
 alias soft-reboot='systemctl soft-reboot'
 
 # ==============================================================================
-# System Configuration Editing (Requires Root Privileges)
+# Config editing (root)
 # ==============================================================================
 
-# Edit Limine bootloader main configuration
-alias limine-config='edit_sudo /boot/limine.conf'
-
-# Edit global Nano text editor configuration
-alias nano-config-global='edit_sudo /etc/nanorc'
-
-# Edit Pacman package manager configuration
-alias pacman-config='edit_sudo /etc/pacman.conf'
+alias limine-config='edit-sudo /boot/limine.conf'
+alias nano-config-global='edit-sudo /etc/nanorc'
+alias pacman-config='edit-sudo /etc/pacman.conf'
 
 # ==============================================================================
-# User Configuration Editing (No Root Required)
+# Config editing (user)
 # ==============================================================================
 
-# Edit Fastfetch configuration JSON file
 alias fastfetch-config='edit ~/.config/fastfetch/config.jsonc'
-
-# Edit local user-level Micro configuration
+alias kitty-config='edit ~/.config/kitty/kitty.conf'
 alias micro-config-settings='edit ~/.config/micro/settings.json'
 alias micro-config-bindings='edit ~/.config/micro/bindings.json'
 
 # ==============================================================================
-# ZSH Shell Modular Configurations (Edit & Auto-Reload)
+# Zsh config
 # ==============================================================================
 
-# Edit primary ZSH configuration file and reload current shell environment
-alias zsh-config='edit ~/.zshrc'
+: ${ZSH_FILE:=aliases}
 
-# Edit ZSH aliases module and reload shell environment
-alias zsh-config-aliases='edit ~/.zsh/aliases.zsh'
+# Pick and edit a modular Zsh config file (Enter keeps the last chosen one).
+zsh-config() {
+  [[ -d $ZSH_FOLDER ]] || { print -u2 "ZSH_FOLDER missing or not a directory: '$ZSH_FOLDER'"; return 1 }
 
-# Edit ZSH prompt theme module and reload shell environment
-alias zsh-config-prompt='edit ~/.zsh/prompt.zsh'
+  local choice
+  read "choice?File:   [m]ain / [a]liases / [k]eybinds / p[l]ugins / p[r]ompt (default: $ZSH_FILE): "
 
-# Edit ZSH plugins module and reload shell environment
-alias zsh-config-plugins='edit ~/.zsh/plugins.zsh'
+  case "${choice:l}" in
+    m|main)         ZSH_FILE="main"      ;;
+    a|aliases)      ZSH_FILE="aliases"   ;;
+    k|keybinds)     ZSH_FILE="keybinds"  ;;
+    l|plugins)      ZSH_FILE="plugins"   ;;
+    r|prompt)       ZSH_FILE="prompt"    ;;
+    "")             ;;
+    *)              echo "Unknown choice, editing $ZSH_FILE" ;;
+  esac
 
-# Edit ZSH keybindings module and reload shell environment
-alias zsh-config-keybinds='edit ~/.zsh/keybinds.zsh'
+  edit "$ZSH_FOLDER/$ZSH_FILE.zsh"
+}
 
-# Reloads ZSH configuration after it was edited
-alias zsh-reload='source ~/.zshrc'
+# Restart zsh to apply config changes.
+alias zsh-reload='exec zsh'
