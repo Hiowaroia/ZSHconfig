@@ -2,7 +2,7 @@
 setopt ERR_EXIT
 
 SRC_DIR=${0:A:h}
-TARGET_FOLDER_LOCATION="$HOME/zsh"
+TARGET_FOLDER_LOCATION="$HOME/.config/zsh"
 TARGET_ZSHRC_LOCATION="$HOME"
 
 echo "This is a script for copying zsh config files into a designated place"
